@@ -1,0 +1,90 @@
+{
+  "_comment": [
+    "Conformance vectors for the macsmith MAC core.",
+    "BOTH implementations must pass these: src/macsmith/mac.py (Python) and",
+    "web/js/mac.js (browser). Neither implementation is the authority - this",
+    "file is. Add a case here before fixing a bug in either one.",
+    "Run: pytest tests/test_mac_vectors.py  and  node web/js/conformance.mjs"
+  ],
+  "normalize": [
+    {"in": "00:1A:2B:3C:4D:5E", "out": "001A2B3C4D5E", "why": "colon"},
+    {"in": "00-1a-2b-3c-4d-5e", "out": "001A2B3C4D5E", "why": "hyphen, lowercase"},
+    {"in": "001a.2b3c.4d5e", "out": "001A2B3C4D5E", "why": "cisco dotted"},
+    {"in": "001A2B3C4D5E", "out": "001A2B3C4D5E", "why": "already bare"},
+    {"in": "00 1A 2B 3C 4D 5E", "out": "001A2B3C4D5E", "why": "space separated"},
+    {"in": "", "out": "", "why": "empty is empty, not an error"}
+  ],
+  "classify": [
+    {"in": "FFFFFFFFFFFF", "out": "broadcast"},
+    {"in": "000000000000", "out": "all-zero"},
+    {"in": "0242AC110002", "out": "laa", "why": "docker container, U/L bit set"},
+    {"in": "01005E000001", "out": "multicast", "why": "IPv4 multicast, I/G set"},
+    {"in": "03005E000001", "out": "multicast-laa", "why": "both bits set"},
+    {"in": "001A2B3C4D5E", "out": "", "why": "ordinary global unicast"},
+    {"in": "001A2B", "out": "", "why": "prefix only, not a full MAC"},
+    {"in": "", "out": "", "why": "empty"}
+  ],
+  "extract": [
+    {"in": "MAC Address: 00:1A:2B:3C:4D:5E", "first": "001A2B3C4D5E", "why": "label stripped"},
+    {"in": "hwaddr: 00-1a-2b-3c-4d-5e", "first": "001A2B3C4D5E", "why": "linux label"},
+    {"in": "Physical Address. . . : 00-1A-2B-3C-4D-5E", "first": "001A2B3C4D5E", "why": "ipconfig"},
+    {"in": "(001a.2b3c.4d5e)", "first": "001A2B3C4D5E", "why": "wrapper chars"},
+    {"in": "fe:35:b6:60:f:ee", "first": "FE35B6600FEE", "why": "single-nibble octet padded"},
+    {"in": "OO:1A:2B:3C:4D:5E", "first": "001A2B3C4D5E", "why": "OCR letter-O for zero"},
+    {"in": "1-800-555-1234", "first": null, "why": "phone number must not parse as a MAC"},
+    {"in": "(415) 555-1212", "first": null, "why": "phone number with wrappers"},
+    {"in": "+44-20-7946-0958", "first": null, "why": "non-uniform groups"},
+    {"in": "cisco", "first": null, "why": "vendor word must not become hex via OCR"},
+    {"in": "no address here", "first": null, "why": "prose: add/e/e/e must not glue into ADDEEE"},
+    {"in": "the bad cafe added a fee", "first": null, "why": "prose: no uniform hex run"},
+    {"in": "00 1A 2B 3C 4D 5E", "first": "001A2B3C4D5E", "why": "uniform 2-char groups still merge"},
+    {"in": "0011 2233 4455", "first": "001122334455", "why": "uniform 4-char groups still merge"},
+    {"in": "", "first": null, "why": "empty"}
+  ],
+  "format": [
+    {"hex": "001A2B3C4D5E", "style": "colon", "out": "00:1A:2B:3C:4D:5E"},
+    {"hex": "001A2B3C4D5E", "style": "hyphen", "out": "00-1A-2B-3C-4D-5E"},
+    {"hex": "001A2B3C4D5E", "style": "cisco", "out": "001a.2b3c.4d5e"},
+    {"hex": "001A2B3C4D5E", "style": "bare", "out": "001A2B3C4D5E"},
+    {"hex": "001a2b3c4d5e", "style": "colon", "out": "00:1A:2B:3C:4D:5E", "why": "input case ignored"},
+    {"hex": "00:1a:2b:3c:4d:5e", "style": "cisco", "out": "001a.2b3c.4d5e", "why": "re-normalizes first"}
+  ],
+  "format_aliases": [
+    {"alias": "pc", "resolves_to": "colon", "why": "Mac-Converter called colon format PC"},
+    {"alias": "windows", "resolves_to": "hyphen"},
+    {"alias": "dotted", "resolves_to": "cisco"},
+    {"alias": "unix", "resolves_to": "colon"}
+  ],
+  "format_errors": [
+    {"hex": "001A2B", "style": "colon", "why": "prefix is not a full MAC"},
+    {"hex": "ZZZZZZZZZZZZ", "style": "colon", "why": "not hex"},
+    {"hex": "001A2B3C4D5E", "style": "klingon", "why": "unknown style"}
+  ],
+  "convert": [
+    {
+      "in": "00:1A:2B:3C:4D:5E", "style": "cisco", "ok": true,
+      "formatted": "001a.2b3c.4d5e", "detected": "colon", "classification": ""
+    },
+    {
+      "in": "001a.2b3c.4d5e", "style": "colon", "ok": true,
+      "formatted": "00:1A:2B:3C:4D:5E", "detected": "cisco", "classification": ""
+    },
+    {
+      "in": "MAC Address: 02:42:ac:11:00:02", "style": "hyphen", "ok": true,
+      "formatted": "02-42-AC-11-00-02", "detected": "colon", "classification": "laa",
+      "why": "extracted from labelled text and classified as locally administered"
+    },
+    {
+      "in": "ff:ff:ff:ff:ff:ff", "style": "bare", "ok": true,
+      "formatted": "FFFFFFFFFFFF", "detected": "colon", "classification": "broadcast"
+    },
+    {
+      "in": "001A2B", "style": "colon", "ok": false,
+      "why": "a 24-bit prefix is a valid OUI but cannot be converted to a full address"
+    },
+    {
+      "in": "1-800-555-1234", "style": "colon", "ok": false,
+      "why": "must refuse rather than emit a plausible-looking address"
+    }
+  ]
+}

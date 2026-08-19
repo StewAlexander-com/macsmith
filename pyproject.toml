@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "macsmith"
+version = "0.1.0"
+description = "Offline MAC address and ARP/MAC-table toolkit for network engineers"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Stewart Alexander" }]
+keywords = ["mac address", "oui", "arp", "cisco", "network", "offline"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: System Administrators",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Topic :: System :: Networking",
+]
+# The core is deliberately stdlib-only: it has to run on a locked-down jump
+# box where pip install is not an option.
+dependencies = []
+
+[project.optional-dependencies]
+# Colour and tables. Everything degrades to plain text when this is absent.
+pretty = ["rich>=13.0"]
+# YAML input for the saltstack importer.
+salt = ["PyYAML>=6.0"]
+dev = ["pytest>=7.0", "PyYAML>=6.0"]
+
+[project.scripts]
+macsmith = "macsmith.cli:main"
+
+[project.urls]
+Homepage = "https://stewalexander-com.github.io/macsmith/"
+Source = "https://github.com/StewAlexander-com/macsmith"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+macsmith = ["data/*.csv"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

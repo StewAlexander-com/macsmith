@@ -5,6 +5,9 @@
 import { extractMacCandidate, normalizeMac } from './mac.js';
 
 const RULE_RE = /^[\s\-=_+|]*$/;
+// Comment lines: '#' from tickets and notes, '!' from Cisco configuration
+// output. Counting these as data rows shifts every column in the summary.
+const COMMENT_RE = /^\s*[#!]/;
 const IPV4_RE = /^\d{1,3}(?:\.\d{1,3}){3}$/;
 const IFACE_RE = /^(?:[A-Za-z]{2,12}-?\d+(?:[/:]\d+)*(?:\.\d+)?|CPU|Switch|Router|Drop)$/;
 const HEADER_WORD_RE = /^[A-Za-z][A-Za-z()/_.-]*$/;
@@ -34,8 +37,31 @@ function looksLikeHeader(cells) {
   return wordish >= Math.max(2, Math.floor(cells.length / 2));
 }
 
-export function detectColumns(rows) {
-  const width = rows.reduce((m, r) => Math.max(m, r.length), 0);
+/** How many rows to inspect when deciding what each column holds. */
+export const DETECTION_SAMPLE = 200;
+
+/**
+ * Evenly-spaced subset of rows used to classify columns.
+ *
+ * Deciding a column's type is expensive per cell, so scanning a 5,000-row
+ * table costs 20,000 MAC extractions and locks the tab for seconds. A few
+ * hundred rows settle it just as well. The stride is even rather than a
+ * prefix so a table that changes shape partway through still gets a say.
+ *
+ * The Python parser samples identically; a different sample would make the
+ * two disagree on wide tables.
+ */
+function detectionSample(rows) {
+  if (rows.length <= DETECTION_SAMPLE) return rows;
+  const stride = Math.ceil(rows.length / DETECTION_SAMPLE);
+  const out = [];
+  for (let i = 0; i < rows.length; i += stride) out.push(rows[i]);
+  return out;
+}
+
+export function detectColumns(allRows) {
+  const width = allRows.reduce((m, r) => Math.max(m, r.length), 0);
+  const rows = detectionSample(allRows);
   const columns = [];
   for (let i = 0; i < width; i += 1) {
     let cells = rows.filter((r) => i < r.length && r[i]).map((r) => r[i]);
@@ -81,7 +107,7 @@ export function parse(text) {
 
   for (const line of (text || '').split('\n')) {
     if (!line.trim()) { skipped += 1; continue; }
-    if (RULE_RE.test(line)) { skipped += 1; continue; }
+    if (RULE_RE.test(line) || COMMENT_RE.test(line)) { skipped += 1; continue; }
     const cells = line.trim().split(/\s+/);
     if (!rows.length && looksLikeHeader(cells)) {
       if (header !== null) skipped += 1;

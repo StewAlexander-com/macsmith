@@ -21,6 +21,9 @@ from .mac import extract_mac_candidate, normalize_mac
 
 # A separator rule: ---- or ==== or a mix, possibly in several columns.
 _RULE_RE = re.compile(r"^[\s\-=_+|]*$")
+# Comment lines: '#' from tickets and notes, '!' from Cisco configuration
+# output. Counting these as data rows shifts every column in the summary.
+_COMMENT_RE = re.compile(r"^\s*[#!]")
 _IPV4_RE = re.compile(r"^\d{1,3}(?:\.\d{1,3}){3}$")
 # Interface names: Gi1/0/1, Fa0/1, Te1/1/1, Eth1/2, Po12, Vlan100, xe-0/0/1,
 # ge-0/0/1.0, and the bare CPU / Switch pseudo-ports Cisco prints.
@@ -31,6 +34,8 @@ _IFACE_RE = re.compile(
 INCOMPLETE_MARKERS = {"INCOMPLETE", "incomplete", "Incomplete"}
 # Cells that carry no value and so should not vote on a column's type.
 _MISSING_VALUE = INCOMPLETE_MARKERS | {"-", "--", "n/a", "N/A", "*"}
+# How many rows to inspect when deciding what each column holds.
+DETECTION_SAMPLE = 200
 
 
 class Column(NamedTuple):
@@ -130,6 +135,25 @@ def _looks_like_header(cells: Sequence[str]) -> bool:
     return wordish >= max(2, len(cells) // 2)
 
 
+def _detection_sample(rows: Sequence[Sequence[str]]) -> Sequence[Sequence[str]]:
+    """Evenly-spaced subset of rows used to classify columns.
+
+    Deciding a column's type is expensive per cell, so scanning a 5,000-row
+    table costs 20,000 MAC extractions and locks the browser tab for seconds.
+    A few hundred rows settle the question just as well. The stride is even
+    rather than taking a prefix so a table that changes shape partway through
+    still gets a say.
+
+    The browser parser samples identically; a different sample would make the
+    two disagree on wide tables.
+    """
+    total = len(rows)
+    if total <= DETECTION_SAMPLE:
+        return rows
+    stride = -(-total // DETECTION_SAMPLE)  # ceiling division
+    return rows[::stride]
+
+
 def detect_columns(rows: Sequence[Sequence[str]]) -> List[Column]:
     """Classify each column by what most of its cells look like.
 
@@ -138,6 +162,7 @@ def detect_columns(rows: Sequence[Sequence[str]]) -> List[Column]:
     kind (mac > ipv4 > interface).
     """
     width = max((len(r) for r in rows), default=0)
+    rows = _detection_sample(rows)
     columns: List[Column] = []
     for i in range(width):
         cells = [r[i] for r in rows if i < len(r) and r[i]]
@@ -182,7 +207,7 @@ def parse(text: str) -> Table:
         if not line.strip():
             skipped += 1
             continue
-        if _RULE_RE.match(line):
+        if _RULE_RE.match(line) or _COMMENT_RE.match(line):
             skipped += 1
             continue
         cells = line.split()

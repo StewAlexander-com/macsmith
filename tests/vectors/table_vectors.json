@@ -1,0 +1,129 @@
+{
+  "_comment": [
+    "Conformance vectors for the table parser.",
+    "BOTH implementations must pass: src/macsmith/table.py and web/js/table.js.",
+    "This closes the same drift gap mac_vectors.json closes for the MAC core -",
+    "the two table parsers were previously ported by hand with nothing holding",
+    "them to the same behaviour.",
+    "Run: pytest tests/test_table_vectors.py  and  node web/js/conformance.mjs"
+  ],
+  "cases": [
+    {
+      "name": "cisco mac address-table with banner and footer",
+      "text": "          Mac Address Table\n-------------------------------------------\n\nVlan    Mac Address       Type        Ports\n----    -----------       --------    -----\n All    0100.0ccc.cccc    STATIC      CPU\n   1    0000.0c07.ac01    DYNAMIC     Gi1/0/1\n   1    001a.2b3c.4d5e    DYNAMIC     Gi1/0/2\nTotal Mac Addresses for this criterion: 3",
+      "rows": 3,
+      "macColumn": 1,
+      "ipColumn": null,
+      "portColumn": 3,
+      "headerAligned": false,
+      "incomplete": 0,
+      "why": "the centered banner must lose to the real header, and the Total footer is not data"
+    },
+    {
+      "name": "cisco show ip arp with unresolved entries",
+      "text": "Protocol  Address          Age (min)  Hardware Addr   Type   Interface\nInternet  10.1.1.1               12   0000.0c07.ac01  ARPA   Vlan1\nInternet  10.1.1.2                -   INCOMPLETE      ARPA   Vlan1\nInternet  10.1.1.3               44   001a.2b3c.4d5e  ARPA   Vlan1\nInternet  10.1.1.4                -   INCOMPLETE      ARPA   Vlan1",
+      "rows": 4,
+      "macColumn": 3,
+      "ipColumn": 1,
+      "portColumn": 5,
+      "headerAligned": false,
+      "incomplete": 2,
+      "why": "INCOMPLETE must not dilute the MAC column below the confidence threshold"
+    },
+    {
+      "name": "linux arp with a single-nibble octet",
+      "text": "Address                  HWtype  HWaddress           Flags Mask            Iface\n10.0.0.1                 ether   fe:35:b6:60:0f:ee   C                     eth0\n10.0.0.2                 ether   00:1a:2b:3c:4d:5e   C                     eth0",
+      "rows": 2,
+      "macColumn": 2,
+      "ipColumn": 0,
+      "portColumn": 4,
+      "headerAligned": false,
+      "incomplete": 0
+    },
+    {
+      "name": "windows line endings from a terminal paste",
+      "text": "Vlan    Mac Address       Type        Ports\r\n   1    0000.0c07.ac01    DYNAMIC     Gi1/0/1\r\n   1    001a.2b3c.4d5e    DYNAMIC     Gi1/0/2\r\n",
+      "rows": 2,
+      "macColumn": 1,
+      "ipColumn": null,
+      "portColumn": 3,
+      "headerAligned": false,
+      "incomplete": 0,
+      "why": "a stray carriage return would corrupt the last cell of every row"
+    },
+    {
+      "name": "tab separated, as pasted from a spreadsheet",
+      "text": "Vlan\tMacAddress\tType\tPorts\n1\t0000.0c07.ac01\tDYNAMIC\tGi1/0/1\n1\t001a.2b3c.4d5e\tDYNAMIC\tGi1/0/2",
+      "rows": 2,
+      "macColumn": 1,
+      "ipColumn": null,
+      "portColumn": 3,
+      "headerAligned": true,
+      "incomplete": 0,
+      "why": "a single-word header lines up with the data, so it is safe to emit"
+    },
+    {
+      "name": "ragged rows, blank lines, and a lone token",
+      "text": "1 0000.0c07.ac01 Gi1/0/1\n2 001a.2b3c.4d5e\n3\n   \n4 0242.ac11.0002 Gi1/0/4 extra trailing columns here",
+      "rows": 4,
+      "macColumn": 1,
+      "ipColumn": null,
+      "portColumn": 2,
+      "headerAligned": false,
+      "incomplete": 0,
+      "why": "short rows must never raise; the original scripts IndexErrored here"
+    },
+    {
+      "name": "every entry unresolved",
+      "text": "Protocol  Address          Age (min)  Hardware Addr   Type   Interface\nInternet  10.1.1.2                -   INCOMPLETE      ARPA   Vlan1\nInternet  10.1.1.4                -   INCOMPLETE      ARPA   Vlan1",
+      "rows": 2,
+      "macColumn": null,
+      "ipColumn": 1,
+      "portColumn": 5,
+      "headerAligned": false,
+      "incomplete": 2,
+      "why": "with no resolved address there is no MAC column to find, and claiming one would be worse"
+    },
+    {
+      "name": "non-ascii comments around real data",
+      "text": "# Núcleo — planta baja ✅\nVlan    Mac Address       Type        Ports\n   1    0000.0c07.ac01    DYNAMIC     Gi1/0/1\n   2    001a.2b3c.4d5e    DYNAMIC     Gi1/0/2",
+      "rows": 2,
+      "macColumn": 1,
+      "ipColumn": null,
+      "portColumn": 3,
+      "headerAligned": false,
+      "incomplete": 0
+    },
+    {
+      "name": "empty input",
+      "text": "",
+      "rows": 0,
+      "macColumn": null,
+      "ipColumn": null,
+      "portColumn": null,
+      "headerAligned": false,
+      "incomplete": 0
+    },
+    {
+      "name": "separator rules only",
+      "text": "-----\n=====\n   \n",
+      "rows": 0,
+      "macColumn": null,
+      "ipColumn": null,
+      "portColumn": null,
+      "headerAligned": false,
+      "incomplete": 0
+    },
+    {
+      "name": "prose with no addresses",
+      "text": "The switch in closet 3 was replaced on Tuesday.\nNothing else of note. Ticket closed.",
+      "rows": 0,
+      "macColumn": null,
+      "ipColumn": null,
+      "portColumn": null,
+      "headerAligned": false,
+      "incomplete": 0,
+      "why": "prose has no columns, so reporting zero data rows is the honest answer"
+    }
+  ]
+}

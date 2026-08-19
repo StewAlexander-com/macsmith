@@ -11,10 +11,12 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import * as mac from './mac.js';
+import * as tbl from './table.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const vectorsPath = join(here, '..', '..', 'tests', 'vectors', 'mac_vectors.json');
-const vectors = JSON.parse(readFileSync(vectorsPath, 'utf8'));
+const vectorDir = join(here, '..', '..', 'tests', 'vectors');
+const vectors = JSON.parse(readFileSync(join(vectorDir, 'mac_vectors.json'), 'utf8'));
+const tableVectors = JSON.parse(readFileSync(join(vectorDir, 'table_vectors.json'), 'utf8'));
 
 let passed = 0;
 const failures = [];
@@ -69,6 +71,26 @@ for (const c of vectors.convert) {
   } else {
     check('convert.error', c.in, result.error.length > 0, true);
   }
+}
+
+for (const c of tableVectors.cases) {
+  const t = tbl.parse(c.text);
+  check('table.rows', c.name, t.rows.length, c.rows);
+  check('table.macColumn', c.name, t.macColumn, c.macColumn);
+  check('table.ipColumn', c.name, t.ipColumn, c.ipColumn);
+  check('table.portColumn', c.name, t.portColumn, c.portColumn);
+  check('table.headerAligned', c.name, t.headerAligned, c.headerAligned);
+  check('table.incomplete', c.name, tbl.findIncomplete(t).length, c.incomplete);
+  // Bounds-safe access, matching the Python side's guarantee.
+  let raised = false;
+  try {
+    for (const row of t.rows) {
+      for (const i of [-1, 0, 3, 99, null, undefined]) t.cell(row, i);
+    }
+  } catch {
+    raised = true;
+  }
+  check('table.cellNeverRaises', c.name, raised, false);
 }
 
 if (failures.length) {

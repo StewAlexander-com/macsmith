@@ -1,0 +1,19 @@
+{
+  "name": "macsmith-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser front end for macsmith, plus the harness that proves its behaviour",
+  "type": "module",
+  "scripts": {
+    "conformance": "node web/js/conformance.mjs",
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "report": "playwright show-report",
+    "serve": "python3 -m http.server 8791 --directory web"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.10.0",
+    "@playwright/test": "^1.49.0"
+  }
+}

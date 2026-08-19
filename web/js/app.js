@@ -507,7 +507,22 @@ function selectTool(name) {
 for (const btn of document.querySelectorAll('.tool-btn')) {
   btn.addEventListener('click', () => selectTool(btn.dataset.tool));
 }
-$('input').addEventListener('input', run);
+/**
+ * Recompute on every keystroke while that is cheap, and coalesce once it is
+ * not. A large paste costs real work, and running it per keystroke is what
+ * makes a tab feel broken; a small input recomputing instantly is what makes
+ * the live preview worth having.
+ */
+const DEBOUNCE_ABOVE_BYTES = 50_000;
+let debounceTimer = null;
+$('input').addEventListener('input', () => {
+  clearTimeout(debounceTimer);
+  if ($('input').value.length < DEBOUNCE_ABOVE_BYTES) {
+    run();
+    return;
+  }
+  debounceTimer = setTimeout(run, 120);
+});
 $('btn-sample').addEventListener('click', () => {
   $('input').value = TOOLS[current].sample;
   run();

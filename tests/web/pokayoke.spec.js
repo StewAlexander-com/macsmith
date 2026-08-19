@@ -143,10 +143,10 @@ test.describe('the detection is shown before it is acted on', () => {
     await app.selectTool('table');
     await app.loadSample();
 
-    const message = await app.detectMessage();
-    expect(message).toMatch(/using column 2 for the MAC/i);
-    expect(message).toMatch(/column 4 for the port/i);
-    expect(message).toMatch(/5 data row/i);
+    expect(await app.chipValue('MAC column'),
+      'the summary must name the column it actually used').toBe('2');
+    expect(await app.chipValue('port column')).toBe('4');
+    expect(await app.chipValue('data rows')).toBe('5');
   });
 
   test('overriding the column changes both the summary and the output', async ({ page }) => {
@@ -160,7 +160,8 @@ test.describe('the detection is shown before it is acted on', () => {
     const after = (await app.rows())[0][0];
 
     expect(after, 'a different column must produce different output').not.toBe(before);
-    expect(await app.detectMessage()).toMatch(/using column 3 for the MAC/i);
+    expect(await app.chipValue('MAC column'),
+      'the summary must follow the override, not the detection').toBe('3');
   });
 
   test('an ambiguous table still commits to one column and says which', async ({ page }) => {
@@ -170,9 +171,8 @@ test.describe('the detection is shown before it is acted on', () => {
     await app.setInput(TWO_MAC_COLUMNS);
     await page.waitForTimeout(200);
 
-    const message = await app.detectMessage();
-    expect(message, 'silence about an ambiguous choice is the failure mode')
-      .toMatch(/using column \d+ for the MAC/i);
+    expect(await app.chipValue('MAC column'),
+      'silence about an ambiguous choice is the failure mode').toMatch(/^\d+$/);
     expect(await app.rowCount()).toBe(2);
   });
 

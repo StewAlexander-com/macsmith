@@ -53,7 +53,7 @@ test.describe('real-world paste shapes', () => {
     await app.setInput(UNICODE_NOISE);
 
     expect(await app.rowCount()).toBe(2);
-    expect(await app.detectMessage()).toMatch(/2 data row/);
+    expect(await app.chipValue('data rows')).toBe('2');
   });
 
   test('mixed address formats in one paste are all found', async ({ page }) => {
@@ -78,7 +78,7 @@ test.describe('real-world paste shapes', () => {
     await app.selectTool('table');
     await app.setInput(LINUX_ARP);
 
-    expect(await app.detectMessage()).toMatch(/using column 3 for the MAC/i);
+    expect(await app.chipValue('MAC column')).toBe('3');
     expect(await app.rowCount()).toBe(2);
   });
 
@@ -101,7 +101,7 @@ test.describe('scale', () => {
 
     const text = bigTable(5000);
     await app.setInput(text);
-    await expect(app.count).toContainText('5000 rows', { timeout: 10_000 });
+    await expect(app.count).toContainText(/5,?000 rows/, { timeout: 10_000 });
 
     // Time the page's own work rather than the harness's input pipeline.
     const elapsed = await page.evaluate((value) => {

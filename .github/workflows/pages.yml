@@ -25,11 +25,19 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install
-        run: pip install -e ".[dev]"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
 
-      # The site is only published if both cores still agree with the shared
-      # vectors, so a drifted browser build cannot reach production.
+      - name: Install
+        run: |
+          pip install -e ".[dev]"
+          npm ci
+
+      # Nothing is published unless both cores still agree with the shared
+      # vectors and the interface still behaves. A drifted browser build or a
+      # broken poka-yoke must not be able to reach production.
       - name: Python conformance
         run: pytest -q
 
@@ -38,6 +46,12 @@ jobs:
 
       - name: Generate vendor database from the packaged IEEE CSVs
         run: python scripts/build_web_data.py
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser behaviour, layout, and accessibility
+        run: npx playwright test
 
       - uses: actions/configure-pages@v5
 

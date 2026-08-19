@@ -89,9 +89,39 @@ export class Macsmith {
     return this.page.locator('#out table tbody tr').count();
   }
 
+  /**
+   * The detection summary as one string, with chips separated.
+   *
+   * Chips are adjacent elements, so raw textContent runs them together
+   * ("5 data rows4 lines skipped"). Joining explicitly keeps assertions
+   * readable and stops a regex matching across a boundary by accident.
+   */
   async detectMessage() {
     if (!(await this.detect.isVisible())) return '';
-    return (await this.detect.textContent()).trim();
+    const chips = await this.detectChips();
+    const notes = await this.detectNotes();
+    return [...chips.map((c) => `${c.value} ${c.label}`), ...notes].join(' | ');
+  }
+
+  /** Detection chips as {value, label} pairs. */
+  async detectChips() {
+    return this.page.locator('#detect .chip').evaluateAll((nodes) =>
+      nodes.map((n) => ({
+        value: n.querySelector('b')?.textContent ?? '',
+        label: (n.textContent ?? '').replace(n.querySelector('b')?.textContent ?? '', '').trim(),
+      }))
+    );
+  }
+
+  /** Value of a named chip, or null. Matching is on the label. */
+  async chipValue(labelPattern) {
+    const chips = await this.detectChips();
+    const found = chips.find((c) => new RegExp(labelPattern, 'i').test(c.label));
+    return found ? found.value : null;
+  }
+
+  async detectNotes() {
+    return this.page.locator('#detect .note').allTextContents();
   }
 
   async exportEnabled() {

@@ -108,6 +108,11 @@ def _has_macish_grouping(token: str) -> bool:
 
     Accepts 2/2/2/2/2/2, 4/4/4, 6/6, and truncated prefix shapes. Rejects
     1-800-555-1234 (1/3/3/4) and +44-20-7946-0958 (mixed sizes).
+
+    Every real MAC notation uses one group width throughout, so uniformity is
+    required at any group count. Checking it only from four groups upward let
+    the date 2026-08-19 through as 4/2/2, which then merged into a plausible
+    eight-character prefix.
     """
     if _has_hex_letter(token):
         return True
@@ -117,7 +122,7 @@ def _has_macish_grouping(token: str) -> bool:
     sizes = [len(g) for g in groups]
     if any(s not in _MAC_GROUP_SIZES for s in sizes):
         return False
-    if len(groups) >= 4 and len(set(sizes)) != 1:
+    if len(set(sizes)) != 1:
         return False
     return True
 
@@ -261,6 +266,58 @@ def extract_mac_candidate(text: str) -> Optional[str]:
     """Best single MAC-shaped run in ``text``, or None."""
     candidates = extract_mac_candidates(text)
     return candidates[0][0] if candidates else None
+
+
+COMPLETE_LEN = 12
+
+
+def _is_single_value_line(line: str) -> bool:
+    """Whether a line holds one deliberately-typed value and nothing else.
+
+    ``ABCDEF`` on its own is someone asking about a prefix and deserves an
+    answer, even a negative one. The same six characters inside "invoice
+    ABCDEF settled" are a word that happens to be valid hex.
+    """
+    text = _LABEL_RE.sub(" ", line)
+    text = text.translate({ord(c): " " for c in _WRAPPER_CHARS})
+    return len(text.split()) == 1
+
+
+def reportable_candidates(text, resolves=None):
+    """Candidates worth putting in front of a user.
+
+    Six or more hex characters is a low bar that ordinary text clears by
+    accident: ``FACADE`` and ``DEADBEEF`` are words, and a date or phone
+    number glues into ``20260819`` and ``79460958`` once separators go. Every
+    one of those was being reported as an unregistered prefix, so real hits
+    arrived mixed with noise the reader had to filter by eye.
+
+    A complete twelve-digit address is kept regardless, because it can be
+    classified even with no registry at hand. A shorter run is only kept when
+    it resolves to a real assignment, or when the line holds nothing else and
+    so was clearly typed on purpose.
+
+    ``resolves`` is a predicate taking hex and returning whether it is a
+    registered prefix. Pass None when no registry is loaded: filtering would
+    then be guesswork, so nothing is dropped.
+    """
+    lines = text.splitlines() or [text]
+    out: List[Tuple[str, bool]] = []
+    seen = set()
+    for line in lines:
+        explicit = _is_single_value_line(line)
+        for hex_only, used_ocr in extract_mac_candidates(line):
+            if hex_only in seen:
+                continue
+            if (len(hex_only) < COMPLETE_LEN
+                    and not explicit
+                    and resolves is not None
+                    and not resolves(hex_only)):
+                continue
+            seen.add(hex_only)
+            out.append((hex_only, used_ocr))
+    out.sort(key=lambda c: (-len(c[0]), c[1]))
+    return out
 
 
 # --- Formatting -------------------------------------------------------------

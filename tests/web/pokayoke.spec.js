@@ -217,20 +217,53 @@ test.describe('honest about finding nothing', () => {
     expect(message, 'the user needs to know the search was real').toMatch(/4 row/);
   });
 
-  test('phone numbers and prose never produce a confident vendor', async ({ page }) => {
+  /**
+   * The original version of this test only checked that no *vendor name* was
+   * invented, which passed while the tool happily listed FACADE, DEADBEEF,
+   * 20260819 and 79460958 as unregistered prefixes. Six real hits arriving
+   * mixed with junk is the friction the tool exists to remove, so the useful
+   * assertion is that the junk is not emitted at all.
+   */
+  test('prose, phone numbers, and dates produce no rows at all', async ({ page }) => {
     const app = new Macsmith(page);
     await app.goto();
     await app.selectTool('vendor');
-    await app.setInput(NOT_MACS);
     await app.waitForDb();
+    await app.setInput(NOT_MACS);
     await page.waitForTimeout(300);
 
     const rows = await app.rows();
-    const organizations = rows.map((r) => r[2] || '');
-    for (const org of organizations) {
-      expect(org, `"${org}" was invented from input containing no MAC address`)
-        .toMatch(/^(—|Private \/ local|Multicast|Broadcast|All-zero|Private multicast|no registry entry)?$/);
-    }
+    const junk = rows.map((r) => r[0]).filter((v) => !/^[0-9A-F]{12}$/.test(v.replace(/[:.-]/g, '')));
+    expect(junk, 'hex-shaped fragments of ordinary text must not be listed')
+      .toEqual([]);
+  });
+
+  test('an address buried in prose is still found, with its vendor', async ({ page }) => {
+    const app = new Macsmith(page);
+    await app.goto();
+    await app.selectTool('vendor');
+    await app.waitForDb();
+    await app.setInput(
+      'ticket [INC0043912] raised 2026-08-19 14:03:22, the AP is 3c22.fb8e.4a12 on Gi1/0/4'
+    );
+    await page.waitForTimeout(300);
+
+    const rows = await app.rows();
+    expect(rows.length, 'exactly the real address, none of the surrounding noise').toBe(1);
+    expect(rows[0][2]).toMatch(/Apple/);
+  });
+
+  test('a prefix typed on its own still gets a straight answer', async ({ page }) => {
+    const app = new Macsmith(page);
+    await app.goto();
+    await app.selectTool('vendor');
+    await app.waitForDb();
+    await app.setInput('ABCDEF');
+    await page.waitForTimeout(300);
+
+    const rows = await app.rows();
+    expect(rows.length, 'a deliberate question deserves an answer, even a negative one').toBe(1);
+    expect(rows[0][3]).toMatch(/unassigned|No registry entry/i);
   });
 
   test('an invalid regular expression is reported, not swallowed', async ({ page }) => {

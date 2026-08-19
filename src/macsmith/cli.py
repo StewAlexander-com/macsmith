@@ -120,7 +120,14 @@ def cmd_vendor(args) -> int:
     values: List[str] = list(args.macs)
     if not values:
         text = outio.read_many([args.file] if args.file else [])
-        values = [h for h, _ in mac.extract_mac_candidates(text)]
+        # Scraping prose turns up six-hex runs that are really words, dates,
+        # and phone numbers, so an unregistered partial found mid-sentence is
+        # dropped rather than reported as "no registry entry".
+        def _resolves(hex_only: str) -> bool:
+            return regs.lookup(hex_only).record is not None
+
+        found = mac.reportable_candidates(text, _resolves)
+        values = [h for h, _ in found]
         if not values:
             outio.note("No MAC-shaped values found in the input.")
             return EXIT_NO_MATCH

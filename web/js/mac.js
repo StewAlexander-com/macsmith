@@ -61,13 +61,19 @@ function looksMacShaped(token) {
   return stripped.length >= 6 && stripped.length <= 12;
 }
 
+/**
+ * Every real MAC notation uses one group width throughout, so uniformity is
+ * required at any group count. Checking it only from four groups upward let
+ * the date 2026-08-19 through as 4/2/2, which then merged into a plausible
+ * eight-character prefix.
+ */
 function hasMacishGrouping(token) {
   if (hasHexLetter(token)) return true;
   const groups = token.split(INNER_SEP_SPLIT_RE);
   if (groups.length < 2) return true;
   const sizes = groups.map((g) => g.length);
   if (sizes.some((s) => !MAC_GROUP_SIZES.has(s))) return false;
-  if (groups.length >= 4 && new Set(sizes).size !== 1) return false;
+  if (new Set(sizes).size !== 1) return false;
   return true;
 }
 
@@ -174,6 +180,58 @@ export function extractMacCandidates(text) {
 export function extractMacCandidate(text) {
   const candidates = extractMacCandidates(text);
   return candidates.length ? candidates[0][0] : null;
+}
+
+export const COMPLETE_LEN = 12;
+
+/**
+ * Whether a line holds one deliberately-typed value and nothing else.
+ *
+ * `ABCDEF` on its own is someone asking about a prefix and deserves an
+ * answer, even a negative one. The same six characters inside "invoice
+ * ABCDEF settled" are a word that happens to be valid hex.
+ */
+function isSingleValueLine(line) {
+  let text = line.replace(LABEL_RE, ' ');
+  for (const ch of WRAPPER_CHARS) text = text.split(ch).join(' ');
+  return text.trim().split(/\s+/).filter(Boolean).length === 1;
+}
+
+/**
+ * Candidates worth putting in front of a user.
+ *
+ * Six or more hex characters is a low bar that ordinary text clears by
+ * accident: `FACADE` and `DEADBEEF` are words, and a date or phone number
+ * glues into `20260819` and `79460958` once separators go. Every one of those
+ * was being reported as an unregistered prefix, so real hits arrived mixed
+ * with noise the reader had to filter by eye.
+ *
+ * A complete twelve-digit address is kept regardless, because it can be
+ * classified even with no registry at hand. A shorter run is only kept when
+ * it resolves to a real assignment, or when the line holds nothing else and
+ * so was clearly typed on purpose.
+ *
+ * `resolves` reports whether hex is a registered prefix. Pass null when no
+ * registry is loaded: filtering would then be guesswork, so nothing is
+ * dropped.
+ */
+export function reportableCandidates(text, resolves = null) {
+  const lines = text.split('\n');
+  const out = [];
+  const seen = new Set();
+  for (const line of lines) {
+    const explicit = isSingleValueLine(line);
+    for (const [hexOnly, usedOcr] of extractMacCandidates(line)) {
+      if (seen.has(hexOnly)) continue;
+      if (hexOnly.length < COMPLETE_LEN && !explicit && resolves && !resolves(hexOnly)) {
+        continue;
+      }
+      seen.add(hexOnly);
+      out.push([hexOnly, usedOcr]);
+    }
+  }
+  out.sort((a, b) => b[0].length - a[0].length || (a[1] === b[1] ? 0 : a[1] ? 1 : -1));
+  return out;
 }
 
 // --- formatting -------------------------------------------------------------

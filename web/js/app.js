@@ -130,6 +130,18 @@ const CLASS_LABELS = {
   multicast: ['Multicast', 'A group destination, not a device. No IEEE assignment.'],
 };
 
+/** Whether a hex run begins with an assigned IEEE prefix. */
+function isRegistered(hexOnly) {
+  if (DB.status !== 'ready') return false;
+  for (const reg of ORDER) {
+    const table = DB.data.registries[reg];
+    const len = PREFIX_LEN[reg];
+    if (!table || hexOnly.length < len) continue;
+    if (table[hexOnly.slice(0, len)]) return true;
+  }
+  return false;
+}
+
 function lookupVendor(value) {
   const result = { org: '', note: '', cleaned: null, classification: '', registry: '' };
   const candidates = mac.extractMacCandidates(value);
@@ -252,7 +264,10 @@ const TOOLS = {
     needsDb: true,
     options: [],
     run: (text) => {
-      const found = mac.extractMacCandidates(text);
+      // Scraping prose turns up six-hex runs that are really words, dates,
+      // and phone numbers, so an unregistered partial found mid-sentence is
+      // dropped rather than listed as "no registry entry".
+      const found = mac.reportableCandidates(text, DB.status === 'ready' ? isRegistered : null);
       if (!found.length) {
         return { detect: { level: 'warn', chips: [],
           notes: [note('No MAC-shaped value found yet. Six hex characters is enough for a vendor lookup.')] },

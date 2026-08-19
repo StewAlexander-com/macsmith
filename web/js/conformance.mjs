@@ -73,6 +73,16 @@ for (const c of vectors.convert) {
   }
 }
 
+// Stub registry shared with the Python runner: does hex begin with an
+// assigned prefix? Both sides must filter against identical data.
+const REGISTERED = vectors.reportable_registered_prefixes || [];
+const resolves = (hexOnly) => REGISTERED.some((prefix) => hexOnly.startsWith(prefix));
+
+for (const c of vectors.reportable || []) {
+  const found = mac.reportableCandidates(c.in, resolves).map(([h]) => h);
+  check('reportable', JSON.stringify(c.in), found, c.out);
+}
+
 for (const c of tableVectors.cases) {
   const t = tbl.parse(c.text);
   check('table.rows', c.name, t.rows.length, c.rows);

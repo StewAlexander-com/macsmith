@@ -62,3 +62,18 @@ def test_convert(case):
     assert result.formatted == case["formatted"]
     assert result.detected == case["detected"]
     assert result.classification == case["classification"]
+
+
+REGISTERED = set(VECTORS.get("reportable_registered_prefixes", []))
+
+
+def _resolves(hex_only: str) -> bool:
+    """Stub registry shared with the browser runner: does hex begin with an
+    assigned prefix?"""
+    return any(hex_only.startswith(prefix) for prefix in REGISTERED)
+
+
+@pytest.mark.parametrize("case", VECTORS["reportable"], ids=lambda c: c["in"][:40] or "empty")
+def test_reportable(case):
+    found = [h for h, _ in mac.reportable_candidates(case["in"], _resolves)]
+    assert found == case["out"], case.get("why", "")

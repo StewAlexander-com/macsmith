@@ -8,6 +8,13 @@
  */
 import { expect } from '@playwright/test';
 
+import { BASE_URL } from '../../playwright.config.js';
+
+/** Origin and path prefix of whatever we are testing, local or deployed. */
+export const SITE = new URL(BASE_URL.endsWith('/') ? BASE_URL : `${BASE_URL}/`);
+/** Resolve a site-relative path against the base, keeping any subdirectory. */
+export const url = (path) => new URL(path.replace(/^\//, ''), SITE).href;
+
 export const TOOLS = ['fmt', 'vendor', 'table', 'incomplete', 'find', 'grep', 'csv'];
 
 /** Tools that need the vendor database, and so trigger the one allowed fetch. */
@@ -29,7 +36,7 @@ export class Macsmith {
   }
 
   async goto() {
-    await this.page.goto('/index.html');
+    await this.page.goto(url('index.html'));
     await expect(this.input).toBeVisible();
   }
 
@@ -153,15 +160,15 @@ export class Macsmith {
 export function recordRequests(page) {
   const record = { all: [], nonGet: [], crossOrigin: [], bodies: [] };
   page.on('request', (request) => {
-    const url = request.url();
+    const href = request.url();
     const method = request.method();
-    record.all.push({ url, method, type: request.resourceType() });
-    if (method !== 'GET') record.nonGet.push({ url, method });
-    if (!url.startsWith('http://127.0.0.1:8791') && !url.startsWith('data:')) {
-      record.crossOrigin.push({ url, method });
+    record.all.push({ url: href, method, type: request.resourceType() });
+    if (method !== 'GET') record.nonGet.push({ url: href, method });
+    if (!href.startsWith(SITE.origin) && !href.startsWith('data:')) {
+      record.crossOrigin.push({ url: href, method });
     }
     const body = request.postData();
-    if (body) record.bodies.push({ url, body });
+    if (body) record.bodies.push({ url: href, body });
   });
   return record;
 }

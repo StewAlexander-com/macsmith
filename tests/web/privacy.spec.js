@@ -9,7 +9,7 @@
  */
 import { expect, test } from '@playwright/test';
 
-import { CANARY, DB_TOOLS, Macsmith, TOOLS, recordRequests } from './helpers.js';
+import { CANARY, DB_TOOLS, Macsmith, SITE, TOOLS, recordRequests } from './helpers.js';
 import { CISCO_ARP, CISCO_MAC_TABLE, MIXED_FORMATS } from './fixtures.js';
 
 /** The only file the page is allowed to fetch beyond its own static assets. */
@@ -22,11 +22,14 @@ const ALLOWED_PATHS = [
   '/favicon.ico',
 ];
 
-function pathOf(url) {
+/** Path relative to the site root, so this works under a Pages subdirectory. */
+function pathOf(href) {
   try {
-    return new URL(url).pathname;
+    const p = new URL(href).pathname;
+    const base = SITE.pathname.replace(/\/$/, '');
+    return base && p.startsWith(base) ? p.slice(base.length) : p;
   } catch {
-    return url;
+    return href;
   }
 }
 

@@ -1,0 +1,50 @@
+name: Refresh IEEE registries
+
+on:
+  schedule:
+    # Mondays at 06:00 UTC. IEEE publishes continuously; weekly is enough to
+    # keep the data inside the 120-day staleness warning.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -e ".[dev]"
+
+      # The script rejects implausible downloads, so a failure here means the
+      # existing data is still in place rather than replaced with an error page.
+      - name: Download registries
+        run: python scripts/refresh_registries.py
+
+      - name: Confirm the refreshed data still passes the vectors
+        run: |
+          pytest -q
+          node web/js/conformance.mjs
+
+      - name: Open a pull request if anything changed
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "Refresh IEEE registry data"
+          title: "Refresh IEEE registry data"
+          body: |
+            Automated weekly refresh of the MA-L, MA-M, and MA-S registries
+            from standards-oui.ieee.org.
+
+            The download was validated for row count and registry type before
+            being written, and the full conformance suite passed against the
+            new data. Merging republishes the browser bundle.
+          branch: chore/refresh-registries
+          delete-branch: true
+          add-paths: src/macsmith/data/*.csv

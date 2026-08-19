@@ -1,0 +1,45 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ["3.9", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - run: pip install -e ".[dev]"
+
+      - name: Python conformance and unit tests
+        run: pytest -q
+
+      # The core has no third-party dependencies on purpose, because it has to
+      # run on a locked-down jump box. This proves it stays that way.
+      - name: Core imports with no optional dependencies installed
+        run: |
+          pip uninstall -y pyyaml
+          python -c "from macsmith import mac, table, registry, cli; print('stdlib-only core OK')"
+
+  browser-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Browser core matches the shared vectors
+        run: node web/js/conformance.mjs

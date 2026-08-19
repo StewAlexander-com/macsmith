@@ -50,6 +50,30 @@ class Table(NamedTuple):
     def width(self) -> int:
         return max((len(r) for r in self.rows), default=0)
 
+    @property
+    def modal_width(self) -> int:
+        """The row width most rows actually have."""
+        if not self.rows:
+            return 0
+        counts: dict = {}
+        for row in self.rows:
+            counts[len(row)] = counts.get(len(row), 0) + 1
+        return max(counts.items(), key=lambda kv: (kv[1], kv[0]))[0]
+
+    @property
+    def header_aligned(self) -> bool:
+        """Whether the header can be trusted to label the data columns.
+
+        Multi-word headings ("Age (min)", "Mac Address") split on whitespace
+        into more cells than the data has, which slides every label one or two
+        columns to the right. Emitting that is worse than emitting nothing,
+        so callers use :meth:`safe_header` instead.
+        """
+        return bool(self.header) and len(self.header) == self.modal_width
+
+    def safe_header(self) -> Optional[List[str]]:
+        return list(self.header) if self.header_aligned else None
+
     def cell(self, row: Sequence[str], index: Optional[int]) -> str:
         """Bounds-safe cell access. Ragged rows yield '' rather than raising."""
         if index is None or index < 0 or index >= len(row):

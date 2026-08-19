@@ -120,7 +120,47 @@ by adding a case to the vectors.
 
 That file has already earned its place — it caught a false positive where hex
 fragments of ordinary words glued together across word boundaries, so the prose
-"no address here" parsed as the OUI prefix `ADDEEE`.
+"no address here" parsed as the OUI prefix `ADDEEE`. A second vector file,
+[`table_vectors.json`](tests/vectors/table_vectors.json), does the same job for
+the table parser, which had been ported by hand with nothing holding the two
+versions to the same behaviour.
+
+## Proving the browser behaves
+
+The vectors prove the two cores agree. They say nothing about the interface, so
+there is a separate suite for that — 244 assertions run at 360, 390, 768, and
+1280 pixels wide.
+
+```bash
+npm install && npx playwright install chromium
+npx playwright test          # all four viewports
+npx playwright test --ui     # step through interactively
+```
+
+Most of these are written adversarially. A feature test asks whether the button
+works; these attempt a mistake and assert it was prevented or made visible.
+
+The important one is [`privacy.spec.js`](tests/web/privacy.spec.js). The page
+tells people that nothing they paste is uploaded, and that sentence is the only
+reason anyone would put an internal ARP table into a browser tab. So it is
+tested rather than asserted: an allowlist of exactly one fetched file, no
+cross-origin request of any kind, no request body, a canary string that never
+appears in any URL, empty storage and cookies, and the tools still working with
+the network switched off.
+
+The rest cover behaviour that would otherwise fail quietly — an export that
+does not match what was on screen, a truncated display that exports truncated
+data, a blocked clipboard that no-ops, a bad regex that returns everything —
+plus real paste shapes (CRLF from PuTTY, tab-separated, ragged, non-ASCII), a
+5,000-row table, and honest degradation when the vendor database is missing,
+corrupt, or slow. `axe-core` checks contrast and semantics at every viewport,
+because "is this readable" is not a question worth answering by opinion.
+
+Writing these found four bugs in code that looked finished: a comment line
+counted as a data row, a warning bar that rendered as an empty box because an
+explicit `display` value beats the `hidden` attribute, a sideways-scrolling
+results box a keyboard user could not reach, and a scroll hint shown under
+results that did not scroll.
 
 ## Development
 
@@ -135,6 +175,10 @@ node web/js/conformance.mjs
 
 python scripts/build_web_data.py     # generate web/data/registry.json
 cd web && python -m http.server 8000  # preview the site
+
+npm install                          # browser suite (dev only)
+npx playwright install chromium
+npx playwright test
 ```
 
 `web/data/registry.json` is generated from the packaged CSVs and is not
